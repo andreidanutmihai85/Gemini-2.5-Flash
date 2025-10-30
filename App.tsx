@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob as GenAIBlob } from '@google/genai';
 
+
+
 // Define the interface for window.aistudio to resolve type conflicts
 interface AIStudio {
   hasSelectedApiKey: () => Promise<boolean>;
@@ -18,6 +20,7 @@ interface ConversationMessage {
   sender: 'user' | 'ai';
   text: string;
 }
+
 
 // --- Helper Functions for Audio Processing (outside component to prevent re-creation) ---
 function decode(base64: string): Uint8Array {
@@ -157,9 +160,7 @@ const App: React.FC = () => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
       sessionRef.current = ai.live.connect({
-     
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-         
         callbacks: {
           onopen: () => {
             console.log('Live session opened.');
@@ -303,6 +304,7 @@ const App: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clearAudioPlayback]); // clearAudioPlayback is a dependency, ensure it's stable
+
 
   const handleToggleRecording = useCallback(() => {
     if (isRecording) {
@@ -449,10 +451,7 @@ const App: React.FC = () => {
 
 
 
-
-
 export default App;
 
 
 
-  
