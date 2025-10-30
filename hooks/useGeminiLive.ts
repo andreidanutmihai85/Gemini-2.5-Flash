@@ -1,7 +1,5 @@
-
 import { useState, useRef, useCallback } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import type { LiveSession } from '@google/genai';
 import { SessionStatus, Speaker, TranscriptEntry } from '../types';
 import { createBlob, decode, decodeAudioData } from '../utils/audio';
 
@@ -14,7 +12,8 @@ export const useGeminiLive = () => {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
+  // FIX: LiveSession is not an exported type. Use `any` or let TypeScript infer.
+  const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
@@ -26,8 +25,12 @@ export const useGeminiLive = () => {
 
   const stopSession = useCallback(async () => {
     if (sessionPromiseRef.current) {
-      const session = await sessionPromiseRef.current;
-      session.close();
+      try {
+        const session = await sessionPromiseRef.current;
+        session.close();
+      } catch (e) {
+        // Ignore errors during close
+      }
       sessionPromiseRef.current = null;
     }
     
@@ -39,8 +42,8 @@ export const useGeminiLive = () => {
     mediaStreamRef.current?.getTracks().forEach(track => track.stop());
     mediaStreamRef.current = null;
 
-    inputAudioContextRef.current?.close();
-    outputAudioContextRef.current?.close();
+    inputAudioContextRef.current?.close().catch(() => {});
+    outputAudioContextRef.current?.close().catch(() => {});
 
     outputSources.forEach(source => source.stop());
     outputSources.clear();
@@ -55,10 +58,6 @@ export const useGeminiLive = () => {
     setTranscript([]);
 
     try {
-      if (!process.env.API_KEY) {
-        throw new Error("API_KEY environment variable not set.");
-      }
-
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('getUserMedia is not supported in this browser.');
       }
@@ -103,29 +102,31 @@ export const useGeminiLive = () => {
             scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
           },
           onmessage: async (message: LiveServerMessage) => {
+            // FIX: The `isFinal` property does not exist on the Transcription object.
+            // We manage transcript finality based on the `turnComplete` event.
             // Handle transcript updates
             if (message.serverContent?.inputTranscription) {
-                const { text, isFinal } = message.serverContent.inputTranscription;
+                const { text } = message.serverContent.inputTranscription;
                 setTranscript(prev => {
                     const last = prev[prev.length - 1];
                     if (last?.speaker === Speaker.User && !last.isFinal) {
                         const updated = [...prev];
-                        updated[prev.length - 1] = { ...last, text: last.text + text, isFinal };
+                        updated[prev.length - 1] = { ...last, text: last.text + text };
                         return updated;
                     }
-                    return [...prev, { speaker: Speaker.User, text, isFinal }];
+                    return [...prev, { speaker: Speaker.User, text, isFinal: false }];
                 });
             }
             if (message.serverContent?.outputTranscription) {
-                const { text, isFinal } = message.serverContent.outputTranscription;
+                const { text } = message.serverContent.outputTranscription;
                 setTranscript(prev => {
                     const last = prev[prev.length - 1];
                     if (last?.speaker === Speaker.AI && !last.isFinal) {
                         const updated = [...prev];
-                        updated[prev.length - 1] = { ...last, text: last.text + text, isFinal };
+                        updated[prev.length - 1] = { ...last, text: last.text + text };
                         return updated;
                     }
-                    return [...prev, { speaker: Speaker.AI, text, isFinal }];
+                    return [...prev, { speaker: Speaker.AI, text, isFinal: false }];
                 });
             }
 
@@ -144,6 +145,14 @@ export const useGeminiLive = () => {
                 source.start(nextStartTime.current);
                 nextStartTime.current += audioBuffer.duration;
                 outputSources.add(source);
+            }
+            
+            if (message.serverContent?.turnComplete) {
+                setTranscript(prev =>
+                    prev.map(entry =>
+                        entry.isFinal ? entry : { ...entry, isFinal: true }
+                    )
+                );
             }
 
             if(message.serverContent?.interrupted){
