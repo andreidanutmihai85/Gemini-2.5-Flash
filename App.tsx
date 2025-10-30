@@ -3,35 +3,73 @@ import { useGeminiLive } from './hooks/useGeminiLive';
 import { SessionStatus, Speaker, TranscriptEntry } from './types';
 import { MicrophoneIcon, StopIcon, LoadingSpinner } from './components/Icons';
 
-const ApiKeyPrompt: React.FC<{ onKeySelect: () => void, error: string | null }> = ({ onKeySelect, error }) => (
+const ApiKeyPrompt: React.FC<{
+  isStudioEnv: boolean;
+  onSelectKey: () => void;
+  onManualSubmit: (key: string) => void;
+  error: string | null;
+}> = ({ isStudioEnv, onSelectKey, onManualSubmit, error }) => {
+  const [keyInput, setKeyInput] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onManualSubmit(keyInput);
+  };
+
+  return (
     <div className="w-full h-screen flex flex-col items-center justify-center bg-gray-900 text-gray-100 p-4 font-sans">
-        <div className="w-full max-w-md text-center bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
-            <h1 className="text-3xl font-bold text-white mb-4">Welcome!</h1>
+      <div className="w-full max-w-md text-center bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
+        <h1 className="text-3xl font-bold text-white mb-4">Welcome!</h1>
+        {isStudioEnv ? (
+          <>
             <p className="text-gray-400 mb-6">
-                To use this real-time voice chat, please select a Google AI API key.
-                Your key is used only for this session and is not stored.
+              To use this real-time voice chat, please select a Google AI API key. Your key is used only for this session and is not stored.
             </p>
             <button
-                onClick={onKeySelect}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-blue-500/50"
+              onClick={onSelectKey}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-blue-500/50"
             >
-                Select API Key
+              Select API Key
             </button>
-            <p className="text-xs text-gray-500 mt-4">
-                For more information on billing, please visit the{' '}
-                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-                    Gemini API documentation
-                </a>.
+          </>
+        ) : (
+          <>
+            <p className="text-gray-400 mb-6">
+              To use this real-time voice chat, please enter your Google AI API key below. Your key is used only for this session.
             </p>
-             {error && (
-              <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-md text-sm">
-                <p className="font-semibold">Error</p>
-                <p>{error}</p>
-              </div>
-            )}
-        </div>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <input
+                type="password"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                placeholder="Enter your API Key"
+                className="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-blue-500/50"
+              >
+                Start Chat
+              </button>
+            </form>
+          </>
+        )}
+        <p className="text-xs text-gray-500 mt-4">
+          For more information on billing, please visit the{' '}
+          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+            Gemini API documentation
+          </a>.
+        </p>
+        {error && (
+          <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-md text-sm">
+            <p className="font-semibold">Error</p>
+            <p>{error}</p>
+          </div>
+        )}
+      </div>
     </div>
-);
+  );
+};
 
 const StatusIndicator: React.FC<{ status: SessionStatus }> = ({ status }) => {
   const statusInfo = {
@@ -89,39 +127,52 @@ export default function App() {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [apiKeyReady, setApiKeyReady] = useState(false);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+  const [isStudioEnv, setIsStudioEnv] = useState(false);
+  const [envChecked, setEnvChecked] = useState(false);
+  const [manualApiKey, setManualApiKey] = useState<string | undefined>();
 
   useEffect(() => {
-    const checkApiKey = async () => {
-        if ((window as any).aistudio && await (window as any).aistudio.hasSelectedApiKey()) {
-            setApiKeyReady(true);
+    const checkEnv = async () => {
+      const studio = (window as any).aistudio;
+      if (studio) {
+        setIsStudioEnv(true);
+        if (await studio.hasSelectedApiKey()) {
+          setApiKeyReady(true);
         }
+      }
+      setEnvChecked(true);
     };
-    checkApiKey();
+    checkEnv();
   }, []);
-
+  
   useEffect(() => {
-    // Handle API key errors from the hook by showing the key selection prompt again.
-    if (error && (error.includes('API key not valid') || error.includes('Requested entity was not found'))) {
+    if (error && (error.includes('API key not valid') || error.includes('API key is invalid') || error.includes('Requested entity was not found'))) {
         setApiKeyReady(false);
-        setApiKeyError(`${error}. Please select a valid API key.`);
+        setApiKeyError(`${error}. Please select or enter a valid API key.`);
         setIsSessionActive(false);
         stopSession();
     }
   }, [error, stopSession]);
 
   const handleSelectKey = async () => {
-    if (!(window as any).aistudio) {
-      setApiKeyError("API key selection is only available when running in the AI Studio environment.");
-      return;
-    }
     try {
-        await (window as any).aistudio.openSelectKey();
-        // Assume success and update state to show the main app, hiding previous errors.
+      await (window as any).aistudio.openSelectKey();
+      setApiKeyReady(true);
+      setApiKeyError(null);
+    } catch (e) {
+      console.error("Error opening API key selection dialog", e);
+      setApiKeyError("Could not open the API key dialog.");
+    }
+  };
+
+  const handleManualKeySubmit = (key: string) => {
+    const trimmedKey = key.trim();
+    if (trimmedKey) {
+        setManualApiKey(trimmedKey);
         setApiKeyReady(true);
         setApiKeyError(null);
-    } catch (e) {
-        console.error("Error opening API key selection dialog", e);
-        setApiKeyError("An unexpected error occurred while opening the API key dialog.");
+    } else {
+        setApiKeyError("Please enter a valid API key.");
     }
   };
   
@@ -130,24 +181,37 @@ export default function App() {
       stopSession();
       setIsSessionActive(false);
     } else {
-      startSession();
+      startSession(manualApiKey);
       setIsSessionActive(true);
     }
   };
 
   useEffect(() => {
     if (status === SessionStatus.Error || status === SessionStatus.Idle) {
-      // Don't change active state if the error is API key related,
-      // as the other useEffect will handle the transition to the key prompt.
-      const isApiKeyError = error && (error.includes('API key not valid') || error.includes('Requested entity was not found'));
+      const isApiKeyError = error && (error.includes('API key not valid') || error.includes('API key is invalid') || error.includes('Requested entity was not found'));
       if (!isApiKeyError) {
         setIsSessionActive(false);
       }
     }
   }, [status, error]);
 
+  if (!envChecked) {
+      return (
+        <div className="w-full h-screen flex items-center justify-center bg-gray-900 text-gray-100">
+            Initializing...
+        </div>
+      );
+  }
+
   if (!apiKeyReady) {
-    return <ApiKeyPrompt onKeySelect={handleSelectKey} error={apiKeyError} />;
+    return (
+        <ApiKeyPrompt
+            isStudioEnv={isStudioEnv}
+            onSelectKey={handleSelectKey}
+            onManualSubmit={handleManualKeySubmit}
+            error={apiKeyError}
+        />
+    );
   }
   
   return (
