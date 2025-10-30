@@ -1,6 +1,7 @@
+
 {
-  "name": "Realtime AI Voice Chat",
-  "description": "An application for real-time voice conversations with AI, utilizing the Gemini Live API for speech-to-text and text-to-speech capabilities.",
+  "name": "Real-Time AI Voice Chat",
+  "description": "Speak with a friendly AI in real-time. This app uses the Gemini Live API to create a natural, low-latency voice conversation.",
   "requestFramePermissions": [
     "microphone"
   ]

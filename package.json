@@ -1,5 +1,5 @@
 {
-  "name": "realtime-ai-voice-chat",
+  "name": "real-time-ai-voice-chat",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.27.0",
+    "@google/genai": "^1.28.0",
     "@tailwindcss/vite": "^4.1.16",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
