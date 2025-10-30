@@ -1,0 +1,7 @@
+{
+  "name": "Realtime AI Voice Chat",
+  "description": "An application for real-time voice conversations with AI, utilizing the Gemini Live API for speech-to-text and text-to-speech capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
