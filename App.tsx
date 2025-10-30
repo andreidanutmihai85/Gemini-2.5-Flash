@@ -90,14 +90,6 @@ const App: React.FC = () => {
   const nextStartTimeRef = useRef<number>(0);
   const outputSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
-
-
-    // Create a new GoogleGenAI instance right before making an API call
-      // to ensure it always uses the most up-to-date API key from the dialog.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-
-      
   // Scroll to bottom of chat
   const chatEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -160,7 +152,9 @@ const App: React.FC = () => {
       mediaStreamSourceRef.current.connect(scriptProcessorRef.current);
       scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
 
-  // =======================aici a fost =====================================================================
+      // Create a new GoogleGenAI instance right before making an API call
+      // to ensure it always uses the most up-to-date API key from the dialog.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
       sessionRef.current = ai.live.connect({
      
