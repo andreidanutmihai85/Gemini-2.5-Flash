@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => {
     return {
       server: {
         port: 3000,
-        host: 'gemini-2-5-flash.onrender.com',
+        host: '0.0.0.0',
+        allowedHosts: true
       },
       plugins: [react()],
       define: {
