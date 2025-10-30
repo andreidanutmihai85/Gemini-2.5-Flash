@@ -258,8 +258,8 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Error starting recording:', err);
       setError(`Failed to start microphone or AI session: ${err instanceof Error ? err.message : String(err)}`);
-      setIsLoading(false);
-      setIsRecording(false);
+      setIsLoading(true);
+      setIsRecording(true);
       handleStopRecording(); // Ensure cleanup if initial setup fails
     }
   }, [isApiKeySelected, clearAudioPlayback, currentInputTranscription, currentOutputTranscription]); // Dependencies for useCallback
