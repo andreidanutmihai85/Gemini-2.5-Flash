@@ -90,6 +90,14 @@ const App: React.FC = () => {
   const nextStartTimeRef = useRef<number>(0);
   const outputSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
+
+
+    // Create a new GoogleGenAI instance right before making an API call
+      // to ensure it always uses the most up-to-date API key from the dialog.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+
+      
   // Scroll to bottom of chat
   const chatEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -152,12 +160,12 @@ const App: React.FC = () => {
       mediaStreamSourceRef.current.connect(scriptProcessorRef.current);
       scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
 
-      // Create a new GoogleGenAI instance right before making an API call
-      // to ensure it always uses the most up-to-date API key from the dialog.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // =======================aici a fost =====================================================================
 
       sessionRef.current = ai.live.connect({
+     
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+         
         callbacks: {
           onopen: () => {
             console.log('Live session opened.');
@@ -258,8 +266,8 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Error starting recording:', err);
       setError(`Failed to start microphone or AI session: ${err instanceof Error ? err.message : String(err)}`);
-      setIsLoading(true);
-      setIsRecording(true);
+      setIsLoading(false);
+      setIsRecording(false);
       handleStopRecording(); // Ensure cleanup if initial setup fails
     }
   }, [isApiKeySelected, clearAudioPlayback, currentInputTranscription, currentOutputTranscription]); // Dependencies for useCallback
