@@ -69,7 +69,7 @@ export const useGeminiLive = () => {
       // Fix: Cast window to any to allow access to vendor-prefixed webkitAudioContext for cross-browser compatibility.
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: OUTPUT_SAMPLE_RATE });
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({});
       sessionPromiseRef.current = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {

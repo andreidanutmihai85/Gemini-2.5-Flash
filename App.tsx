@@ -3,9 +3,6 @@ import { useGeminiLive } from './hooks/useGeminiLive';
 import { SessionStatus, Speaker, TranscriptEntry } from './types';
 import { MicrophoneIcon, StopIcon, LoadingSpinner } from './components/Icons';
 
-// FIX: Remove conflicting global declaration for window.aistudio.
-// Type assertion will be used to access the property instead.
-
 const ApiKeyPrompt: React.FC<{ onKeySelect: () => void, error: string | null }> = ({ onKeySelect, error }) => (
     <div className="w-full h-screen flex flex-col items-center justify-center bg-gray-900 text-gray-100 p-4 font-sans">
         <div className="w-full max-w-md text-center bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
@@ -28,8 +25,8 @@ const ApiKeyPrompt: React.FC<{ onKeySelect: () => void, error: string | null }> 
             </p>
              {error && (
               <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-md text-sm">
-                <p className="font-semibold">Authentication Error</p>
-                <p>{error}. Please select a valid API key.</p>
+                <p className="font-semibold">Error</p>
+                <p>{error}</p>
               </div>
             )}
         </div>
@@ -95,7 +92,6 @@ export default function App() {
 
   useEffect(() => {
     const checkApiKey = async () => {
-        // FIX: Use type assertion to avoid global type conflicts.
         if ((window as any).aistudio && await (window as any).aistudio.hasSelectedApiKey()) {
             setApiKeyReady(true);
         }
@@ -107,21 +103,25 @@ export default function App() {
     // Handle API key errors from the hook by showing the key selection prompt again.
     if (error && (error.includes('API key not valid') || error.includes('Requested entity was not found'))) {
         setApiKeyReady(false);
-        setApiKeyError(error);
+        setApiKeyError(`${error}. Please select a valid API key.`);
         setIsSessionActive(false);
         stopSession();
     }
   }, [error, stopSession]);
 
   const handleSelectKey = async () => {
+    if (!(window as any).aistudio) {
+      setApiKeyError("API key selection is only available when running in the AI Studio environment.");
+      return;
+    }
     try {
-        // FIX: Use type assertion to avoid global type conflicts.
         await (window as any).aistudio.openSelectKey();
         // Assume success and update state to show the main app, hiding previous errors.
         setApiKeyReady(true);
         setApiKeyError(null);
     } catch (e) {
         console.error("Error opening API key selection dialog", e);
+        setApiKeyError("An unexpected error occurred while opening the API key dialog.");
     }
   };
   
