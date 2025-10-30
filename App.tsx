@@ -1,20 +1,9 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, LiveSession, LiveServerMessage, Modality, Blob as GenAIBlob } from '@google/genai';
 
 
-
-// Define the interface for window.aistudio to resolve type conflicts
-interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
-// Extend the global Window interface
-declare global {
-  interface Window {
-    aistudio: AIStudio;
-  }
-}
+// --- REMOVED: AIStudio interface and declare global ---
 
 interface ConversationMessage {
   sender: 'user' | 'ai';
@@ -75,6 +64,8 @@ function createBlob(data: Float32Array): GenAIBlob {
 }
 // --- End Helper Functions ---
 
+const LOCAL_STORAGE_KEY = process.env.API_KEY;
+
 const App: React.FC = () => {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -82,7 +73,10 @@ const App: React.FC = () => {
   const [currentInputTranscription, setCurrentInputTranscription] = useState<string>('');
   const [currentOutputTranscription, setCurrentOutputTranscription] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [isApiKeySelected, setIsApiKeySelected] = useState<boolean | null>(null);
+  
+  // NEW STATE for API Key management
+  const [apiKey, setApiKey] = useState<string>('');
+  const hasApiKey = !!apiKey;
 
   const sessionRef = useRef<Promise<LiveSession> | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -99,19 +93,26 @@ const App: React.FC = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationHistory, currentInputTranscription, currentOutputTranscription]);
 
-  // Check API key status on mount
+  // Load API key from localStorage on mount
   useEffect(() => {
-    const checkApiKey = async () => {
-      if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setIsApiKeySelected(selected);
-      } else {
-        // Fallback for environments without aistudio. This might mean direct API_KEY is expected.
-        setIsApiKeySelected(true);
-      }
-    };
-    checkApiKey();
+    const storedKey = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (storedKey) {
+      setApiKey(storedKey);
+    } 
   }, []);
+
+  // Handler for API key input change
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newKey = e.target.value.trim();
+    setApiKey(newKey);
+    // Persist the key to localStorage
+    if (newKey) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, newKey);
+        setError(null); // Clear error if key is entered
+    } else {
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+    }
+  }
 
   const clearAudioPlayback = useCallback(() => {
     for (const source of outputSourcesRef.current.values()) {
@@ -125,8 +126,9 @@ const App: React.FC = () => {
 
   const handleStartRecording = useCallback(async () => {
     setError(null);
-    if (isApiKeySelected === false) {
-      setError("Please select an API key first.");
+    // Use hasApiKey state check
+    if (!hasApiKey) {
+      setError("Please enter your Gemini API key first.");
       return;
     }
 
@@ -134,19 +136,19 @@ const App: React.FC = () => {
 
     try {
       mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Fix: Use window.AudioContext directly, removing deprecated webkitAudioContext fallback.
+      // Use window.AudioContext
       inputAudioContextRef.current = new window.AudioContext({ sampleRate: 16000 });
-      // Fix: Use window.AudioContext directly, removing deprecated webkitAudioContext fallback.
+      // Use window.AudioContext
       outputAudioContextRef.current = new window.AudioContext({ sampleRate: 24000 });
 
       mediaStreamSourceRef.current = inputAudioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
+      // NOTE: ScriptProcessorNode is deprecated. For production, consider using AudioWorklet.
       scriptProcessorRef.current = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
 
       scriptProcessorRef.current.onaudioprocess = (audioProcessingEvent) => {
         const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
         const pcmBlob = createBlob(inputData);
-        // CRITICAL: Solely rely on sessionPromise resolves and then call `session.sendRealtimeInput`,
-        // **do not** add other condition checks.
+        // CRITICAL: Solely rely on sessionPromise resolves and then call `session.sendRealtimeInput`
         sessionRef.current?.then((session) => {
           session.sendRealtimeInput({ media: pcmBlob });
         });
@@ -155,9 +157,8 @@ const App: React.FC = () => {
       mediaStreamSourceRef.current.connect(scriptProcessorRef.current);
       scriptProcessorRef.current.connect(inputAudioContextRef.current.destination);
 
-      // Create a new GoogleGenAI instance right before making an API call
-      // to ensure it always uses the most up-to-date API key from the dialog.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Use the state-managed API key
+      const ai = new GoogleGenAI({ apiKey: apiKey });
 
       sessionRef.current = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -231,9 +232,10 @@ const App: React.FC = () => {
           },
           onerror: (e: ErrorEvent) => {
             console.error('Live session error:', e);
-            if (e.message && e.message.includes("Requested entity was not found.")) {
-                setError("API key issue: Please select your API key again. (ai.google.dev/gemini-api/docs/billing)");
-                setIsApiKeySelected(false);
+            if (e.message && e.message.includes("401 Unauthorized")) {
+                setError("API key issue: Unauthorized. Please check your Gemini API key.");
+            } else if (e.message && e.message.includes("Requested entity was not found.")) {
+                setError("API key issue: Please check your Gemini API key. (ai.google.dev/gemini-api/docs/billing)");
             } else {
                 setError("A session error occurred. Please try again.");
             }
@@ -265,7 +267,7 @@ const App: React.FC = () => {
       setIsRecording(false);
       handleStopRecording(); // Ensure cleanup if initial setup fails
     }
-  }, [isApiKeySelected, clearAudioPlayback, currentInputTranscription, currentOutputTranscription]); // Dependencies for useCallback
+  }, [hasApiKey, apiKey, clearAudioPlayback, currentInputTranscription, currentOutputTranscription]); // Dependencies updated
 
   const handleStopRecording = useCallback(() => {
     setIsRecording(false);
@@ -302,8 +304,7 @@ const App: React.FC = () => {
       outputAudioContextRef.current.close().catch(e => console.error("Error closing output audio context:", e));
       outputAudioContextRef.current = null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearAudioPlayback]); // clearAudioPlayback is a dependency, ensure it's stable
+  }, [clearAudioPlayback]);
 
 
   const handleToggleRecording = useCallback(() => {
@@ -314,42 +315,41 @@ const App: React.FC = () => {
     }
   }, [isRecording, handleStartRecording, handleStopRecording]);
 
-  const handleSelectApiKey = async () => {
-    if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-
-      
-      try {
-        await window.aistudio.openSelectKey();
-        setIsApiKeySelected(true); // Assume success to avoid race condition
-        setError(null);
-      } catch (err) {
-        console.error("Error opening API key selection:", err);
-        setError("Could not open API key selection. Please ensure you're in a supported environment.");
-      }
-    } else {
-      setError("API key selection utility not available.");
-    }
-  };
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <header className="bg-indigo-600 text-white p-4 shadow-md flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Realtime AI Voice Chat</h1>
-        {isApiKeySelected === false && (
-          <button
-            onClick={handleSelectApiKey}
-            className="px-4 py-2 bg-white text-indigo-700 rounded-lg shadow hover:bg-gray-100 transition-colors duration-200"
-          >
-            Select API Key
-          </button>
-        )}
+      <header className="bg-indigo-600 text-white p-4 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <h1 className="text-2xl font-bold mb-2 sm:mb-0">Realtime AI Voice Chat</h1>
+        <div className="flex items-center w-full sm:w-auto">
+            <label htmlFor="api-key-input" className="sr-only">Gemini API Key</label>
+            <input
+                id="api-key-input"
+                type="password"
+                placeholder={hasApiKey ? "API Key is set (Click Clear to change)" : "Enter Gemini API Key"}
+                value={apiKey}
+                onChange={handleApiKeyChange}
+                className="w-full sm:w-80 px-3 py-1 text-sm text-gray-800 rounded-l-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-white"
+            />
+            <button
+                onClick={() => setApiKey('')}
+                className="px-3 py-1 bg-white text-indigo-700 rounded-r-lg shadow hover:bg-gray-100 transition-colors duration-200 text-sm h-full"
+                title="Clear API Key from local storage"
+            >
+                {hasApiKey ? 'Clear' : 'Set'}
+            </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 space-y-4">
         {conversationHistory.length === 0 && !currentInputTranscription && !currentOutputTranscription && (
           <div className="text-center text-gray-500 mt-10">
             <p className="text-lg">Start a real-time voice conversation with the AI.</p>
-            <p className="text-sm">Click the microphone button below to begin.</p>
+            <p className="text-sm">
+                First, enter your Gemini API key in the header.
+            </p>
+            <p className="text-sm mt-1">
+                Then, click the microphone button below to begin.
+            </p>
           </div>
         )}
 
@@ -395,7 +395,7 @@ const App: React.FC = () => {
       <footer className="sticky bottom-0 bg-white p-4 shadow-lg border-t border-gray-200 flex flex-col items-center">
         <button
           onClick={handleToggleRecording}
-          disabled={isLoading || isApiKeySelected === false}
+          disabled={isLoading || !hasApiKey}
           className={`
             w-16 h-16 rounded-full flex items-center justify-center
             transition-all duration-300 ease-in-out
@@ -404,7 +404,7 @@ const App: React.FC = () => {
               ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300 transform scale-105 active:scale-100'
               : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300'
             }
-            ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}
+            ${isLoading || !hasApiKey ? 'opacity-60 cursor-not-allowed' : ''}
           `}
         >
           {isLoading ? (
@@ -435,7 +435,7 @@ const App: React.FC = () => {
         )}
         {!isRecording && !isLoading && (
           <p className="text-sm text-gray-600 mt-2">
-            Click to {isApiKeySelected === false ? 'select API key and then' : ''} start conversation
+            {hasApiKey ? 'Click to start conversation' : 'Enter API Key to enable recording'}
           </p> 
         )}
         
@@ -449,9 +449,4 @@ const App: React.FC = () => {
 };
 
 
-
-
 export default App;
-
-
-
