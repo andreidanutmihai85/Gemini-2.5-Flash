@@ -130,6 +130,7 @@ export default function App() {
   const [isStudioEnv, setIsStudioEnv] = useState(false);
   const [envChecked, setEnvChecked] = useState(false);
   const [manualApiKey, setManualApiKey] = useState<string | undefined>();
+  const autoStartedRef = useRef(false);
 
   useEffect(() => {
     const checkEnv = async () => {
@@ -139,6 +140,11 @@ export default function App() {
         if (await studio.hasSelectedApiKey()) {
           setApiKeyReady(true);
         }
+      } else {
+        // Not in AI studio, use the hardcoded key.
+        setIsStudioEnv(false);
+        setManualApiKey('AIzaSyCiYJLhhSRcsXBT4e-tixO9pvHCqptGtzo');
+        setApiKeyReady(true);
       }
       setEnvChecked(true);
     };
@@ -153,6 +159,15 @@ export default function App() {
         stopSession();
     }
   }, [error, stopSession]);
+
+  // Auto-start the session once the API key is ready
+  useEffect(() => {
+    if (apiKeyReady && !isSessionActive && status === SessionStatus.Idle && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      startSession(manualApiKey);
+      setIsSessionActive(true);
+    }
+  }, [apiKeyReady, isSessionActive, status, startSession, manualApiKey]);
 
   const handleSelectKey = async () => {
     try {
