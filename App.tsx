@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGeminiLive } from './hooks/useGeminiLive';
-import { SessionStatus, Speaker, TranscriptEntry } from './types';
+import { SessionStatus } from './types';
 import { MicrophoneIcon, StopIcon, LoadingSpinner } from './components/Icons';
+import { PasswordScreen } from './components/PasswordScreen';
+import { VideoAvatar } from './components/VideoAvatar';
 
 const ApiKeyPrompt: React.FC<{
   isStudioEnv: boolean;
@@ -87,43 +89,9 @@ const StatusIndicator: React.FC<{ status: SessionStatus }> = ({ status }) => {
   );
 };
 
-const TranscriptView: React.FC<{ transcript: TranscriptEntry[] }> = ({ transcript }) => {
-    const endOfTranscriptRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        endOfTranscriptRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [transcript]);
-
-    return (
-        <div className="flex-grow bg-gray-800/50 rounded-lg p-4 overflow-y-auto space-y-4">
-            {transcript.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                    <p className="text-gray-400">Your conversation will appear here.</p>
-                </div>
-            ) : (
-                transcript.map((entry, index) => (
-                    <div key={index} className={`flex ${entry.speaker === Speaker.User ? 'justify-end' : 'justify-start'}`}>
-                        <div
-                            className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-xl ${
-                                entry.speaker === Speaker.User
-                                    ? 'bg-blue-600 text-white rounded-br-none'
-                                    : 'bg-gray-700 text-gray-200 rounded-bl-none'
-                            } ${!entry.isFinal ? 'opacity-70' : ''}`}
-                        >
-                            <span className="font-bold text-sm block mb-1">{entry.speaker === Speaker.User ? 'You' : 'AI'}</span>
-                            <p>{entry.text}</p>
-                        </div>
-                    </div>
-                ))
-            )}
-            <div ref={endOfTranscriptRef} />
-        </div>
-    );
-};
-
-
 export default function App() {
-  const { status, transcript, error, startSession, stopSession } = useGeminiLive();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { status, error, startSession, stopSession, isSpeaking } = useGeminiLive();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [apiKeyReady, setApiKeyReady] = useState(false);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
@@ -131,9 +99,11 @@ export default function App() {
   const [envChecked, setEnvChecked] = useState(false);
   const [manualApiKey, setManualApiKey] = useState<string | undefined>();
   const autoStartedRef = useRef(false);
-
+ 
   useEffect(() => {
     const checkEnv = async () => {
+      // The `window.aistudio` object is injected by the AI Studio environment.
+      // We check for its existence to determine the execution context.
       const studio = (window as any).aistudio;
       if (studio) {
         setIsStudioEnv(true);
@@ -141,7 +111,7 @@ export default function App() {
           setApiKeyReady(true);
         }
       } else {
-        // Not in AI studio, use the hardcoded key.
+        // Not in AI studio, automatically use the provided key.
         setIsStudioEnv(false);
         setManualApiKey('AIzaSyCiYJLhhSRcsXBT4e-tixO9pvHCqptGtzo');
         setApiKeyReady(true);
@@ -172,6 +142,8 @@ export default function App() {
   const handleSelectKey = async () => {
     try {
       await (window as any).aistudio.openSelectKey();
+      // Assume success and optimistically set the key as ready.
+      // The error handling effect will catch if the selected key is invalid.
       setApiKeyReady(true);
       setApiKeyError(null);
     } catch (e) {
@@ -210,10 +182,14 @@ export default function App() {
     }
   }, [status, error]);
 
+  if (!isAuthenticated) {
+    return <PasswordScreen onSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   if (!envChecked) {
       return (
         <div className="w-full h-screen flex items-center justify-center bg-gray-900 text-gray-100">
-            Initializing...
+            <LoadingSpinner className="w-10 h-10" />
         </div>
       );
   }
@@ -238,7 +214,7 @@ export default function App() {
             </header>
 
             <main className="flex-grow p-4 flex flex-col gap-4 min-h-0">
-                <TranscriptView transcript={transcript} />
+                <VideoAvatar isSpeaking={isSpeaking} />
                 {error && <div className="text-center text-red-400 bg-red-900/50 p-2 rounded-md">{error}</div>}
             </main>
             
