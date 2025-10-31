@@ -25,7 +25,7 @@ export const VideoAvatar: React.FC<VideoAvatarProps> = ({ isSpeaking }) => {
   }, [isSpeaking]);
 
   return (
-    <div className="flex-grow flex items-center justify-center bg-black rounded-lg overflow-hidden">
+    <div className="absolute inset-0 w-full h-full bg-black">
       <video
         ref={videoRef}
         src={VIDEO_URL}
