@@ -90,7 +90,7 @@ const StatusIndicator: React.FC<{ status: SessionStatus }> = ({ status }) => {
 };
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { status, error, startSession, stopSession, isSpeaking } = useGeminiLive();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [apiKeyReady, setApiKeyReady] = useState(false);
@@ -182,9 +182,9 @@ export default function App() {
     }
   }, [status, error]);
 
-  if (!isAuthenticated) {
-    return <PasswordScreen onSuccess={() => setIsAuthenticated(true)} />;
-  }
+  // if (!isAuthenticated) {
+  //   return <PasswordScreen onSuccess={() => setIsAuthenticated(true)} />;
+  // }
 
   if (!envChecked) {
       return (

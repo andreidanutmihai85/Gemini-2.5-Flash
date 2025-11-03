@@ -4,7 +4,7 @@ interface VideoAvatarProps {
   isSpeaking: boolean;
 }
 
-const VIDEO_URL = 'https://files2.heygen.ai/aws_pacific/avatar_tmp/fb46759e76394978bf32c819948684b0/vaURJqljRCydrzTMVkWllQIm0GwYfbeh2/1ec11652d32c4566ad6450721797ca85.mp4?Expires=1762521515&Signature=Ju5Z9WNzsoLhl08Cul-EQ3jwXWN66t7qZtkyf8na3WbbI8jckENzYLKXynfiNtjfPP~MF9W95TcMucSP3zIzVcXqM8hB45YayC22U~tkqi18HPu9i91RZmyQ4kJtl8rO8d4emaxRcrOgEy8NuZ3hAI1l4hlyROh80DETmeG~kzpD-ew-sExEdfOiE~-gC2D5l8YF5AgtTFdwhNYLLzYPv3bLpDDjUGfn0JiyKUxGIADskgkzduzfbsrShhwRzTnLCtfNhFO~Q41FQ5eG9IvgaJMon64Z3ek8dEsPG2wGjlBux~coFzScUIEEQ7SWHw-nc~muy1ZKPGV46isRTCENxQ__&Key-Pair-Id=K38HBHX5LX3X2H';
+const VIDEO_URL = 'https://cdn.pixabay.com/video/2022/10/18/135431-761676544_large.mp4';
 
 export const VideoAvatar: React.FC<VideoAvatarProps> = ({ isSpeaking }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
